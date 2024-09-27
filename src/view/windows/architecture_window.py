@@ -1,4 +1,5 @@
 import subprocess
+import sys
 
 from PySide2 import QtCore, QtGui
 from PySide2.QtGui import QPainterPath
@@ -27,10 +28,13 @@ class ArchitectureWindow(QDockWidget):
         self.setWindowTitle("Architecture")
         self.central_widget = QGroupBox()
         self.setWidget(self.central_widget)
-        self.architecture_dialog_button = QAction(QtGui.QIcon('resources/icons/'
-                                                              'architecture-options.svg'),
-                                                  'Model options...', self)
-        self.architecture_dialog_button.triggered.connect(self.open_architecture_dialog)
+        self.architecture_dialog_button = QAction(QtGui.QIcon(
+            'resources/icons/architecture-options.svg'),
+            'Model options...', self
+        )
+        self.architecture_dialog_button.triggered.connect(
+            self.open_architecture_dialog
+        )
         self.tool_bar = QToolBar()
         self.tool_bar.addAction(self.architecture_dialog_button)
         self.model_name_label = QLabel()
@@ -40,7 +44,9 @@ class ArchitectureWindow(QDockWidget):
         self.tool_layout.addWidget(self.tool_bar)
         self.scene = QGraphicsScene()
         self.view = ZoomableGraphicsView(self.scene)
-        self.view.setRenderHints(QtGui.QPainter.Antialiasing|QtGui.QPainter.TextAntialiasing)
+        self.view.setRenderHints(
+            QtGui.QPainter.Antialiasing | QtGui.QPainter.TextAntialiasing
+        )
         self.sub_window = None
         self.tool_layout.addWidget(self.view)
         self.init_renderer()
@@ -70,10 +76,18 @@ class ArchitectureWindow(QDockWidget):
                 self.graph.add_edge(layer, inbound_layer)
 
     def layout_scene(self):
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        startupinfo.wShowWindow = subprocess.SW_HIDE
-        self.node_position, self.edge_position = pydot_layout(self.graph, prog='dot')
+        # Check if the operating system is Windows
+        if sys.platform == 'win32':
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+        else:
+            startupinfo = None  # No equivalent on non-Windows
+
+        # Proceed with your layout logic
+        self.node_position, self.edge_position = pydot_layout(
+            self.graph, prog='dot'
+        )
 
     def add_nodes_to_scene(self):
         for node in self.graph.nodes():
@@ -86,15 +100,33 @@ class ArchitectureWindow(QDockWidget):
         for (from_item, to_item) in self.graph.edges():
             edge_item = QGraphicsPathItem()
             path = QPainterPath()
-            #path.moveTo(from_item.position[0], from_item.position[1])
-            points = self.edge_position[(from_item, to_item)]
-            path.moveTo(from_item.position[0], from_item.position[1])
-            path.lineTo(points[0][0], points[0][1])
-            for i in range(0, len(points)-1):
-                if (i%3) == 0:
+            points = self.edge_position.get((from_item, to_item), None)
+            if points is None or len(points) == 0:
+                print(
+                    f"Warning: No points found for edge from {from_item}"
+                    f" to {to_item}."
+                )
+                continue  # Skip this edge
+            # Check if we can safely access points[0]
+            if len(points) > 0:
+                path.moveTo(from_item.position[0], from_item.position[1])
+                path.lineTo(points[0][0],
+                            points[0][1])  # Safely access points[0]
+            else:
+                print(
+                    f"Warning: Points list for edge from {from_item} to "
+                    f"{to_item} is empty.")
+                continue  # Skip if there are no points
+            # Add cubic bezier curves for the rest of the points
+            for i in range(0, len(points) - 1):
+                if (i % 3) == 0:
                     path.moveTo(points[i][0], points[i][1])
-                    path.cubicTo(points[i+1][0], points[i+1][1], points[i+2][0],
-                                 points[i+2][1], points[i+3][0], points[i+3][1])
+                    if i + 3 < len(points):
+                        path.cubicTo(
+                            points[i + 1][0], points[i + 1][1],
+                            points[i + 2][0], points[i + 2][1],
+                            points[i + 3][0], points[i + 3][1]
+                        )
             path.moveTo(points[-1][0], points[-1][1])
             path.lineTo(to_item.position[0], to_item.position[1])
             edge_item.setPath(path)
@@ -116,7 +148,9 @@ class ArchitectureWindow(QDockWidget):
         node.select()
         self.selected_node = node
         if self.parent().properties_dock is not None:
-            self.parent().properties_dock.on_layer_selected(self.get_selected_node())
+            self.parent().properties_dock.on_layer_selected(
+                self.get_selected_node()
+            )
 
     def get_selected_node(self):
         if self.selected_node is None:
@@ -129,7 +163,9 @@ class ArchitectureWindow(QDockWidget):
 
     def init_option_dialog(self, title="Model options"):
         self.sub_window = ArchitectureSettingsDialog(title, parent=self)
-        self.sub_window.setting_dialog_closed.connect(self.on_option_dialog_close)
+        self.sub_window.setting_dialog_closed.connect(
+            self.on_option_dialog_close
+        )
 
     def open_architecture_dialog(self):
         if self.sub_window is None:

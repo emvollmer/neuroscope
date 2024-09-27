@@ -63,12 +63,15 @@ class MainWindow(QMainWindow):
 
     def make_window_full_screen(self):
         desktop = QDesktopWidget()
-        geometry = desktop.availableGeometry()
+        screen = QApplication.primaryScreen()   # handles DeprecationWarning
+        geometry = screen.availableGeometry()
         self.setGeometry(geometry)
         self.showMaximized()
 
     def set_main_window_title(self):
-        self.setWindowTitle(self.tr("Neuroscope – XAI for classification and semantic segmentation"))
+        self.setWindowTitle(self.tr(
+            "Neuroscope – XAI for classification and semantic segmentation"
+        ))
 
     def initialize_menu_bar(self):
         self.menuBar()
@@ -122,9 +125,15 @@ class MainWindow(QMainWindow):
         self.import_weights_action = ImportWeights(self, self.document)
         self.import_images_action = ImportImageAction(self, self.input_images)
         self.select_ground_truth_dir = SelectGroundTruthDir(self, self.input_images)
-        self.keras_classification_example = KerasClassificationExample(self, self.document)
-        self.keras_segmentation_example = KerasSegmentationExample(self, self.document)
-        self.keras_segmentation_Cognitwin_example = KerasSegmentationCognitwinExample(self, self.document)
+        self.keras_classification_example = KerasClassificationExample(
+            self, self.document
+        )
+        self.keras_segmentation_example = KerasSegmentationExample(
+            self, self.document
+        )
+        self.keras_segmentation_Cognitwin_example = (
+            KerasSegmentationCognitwinExample(self, self.document)
+        )
         self.exit_application_action = QAction(
             QIcon('resources/icons/exit.svg'), 'E&xit', self)
         self.exit_application_action.triggered.connect(self.close)
