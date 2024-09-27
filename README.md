@@ -22,15 +22,15 @@ using the example of traffic scene analysis.
   * Make sure the `channel_priority` of `conda` is `false` by running `conda config --set channel_priority false`
   * Run `conda env create -f %path_to_the_yml_file%` to create an environment.
 
-4. To verify that the environment was installed correctly, run `conda env list`. You should see a new environment on the list.
+4. To verify that the environment was installed correctly, run `conda env list`. You should see a new environment called `neuroscope_cpu` or `_gpu` on the list.
 
 ### Setting up PyCharm configuration
 
 The next steps are provided for PyCharm, but you can use them as a reference for a different IDE.
 
-1. In `File > Settings > Project:neuroscope > Project Interpreter`, click on the cog on the right.  
-Select `Add > Conda environment > Existing environment`, and specify `python.exe` from the environment that was created in the previous steps.  
-After selecting the interpreter, you should see many packages identified from the conda environment.  
+1. In `File > Settings > Project:neuroscope > Project Interpreter`, click on `Add interpreter` on the right and select `Add local interpreter...`.
+Choose `Conda environment` from the left menu, select `Use existing environment`, and specify `neuroscope_cpu/gpu` from the dropdown menu. 
+After selecting the interpreter, you should see all packages identified from the conda environment.  
 2. In `Run > Edit Configurations`, in the upper-left corner, click `+` and select `Python`.  
 In the opened window, select `Python Interpreter` if it's not autoselected.  
 In the `Script path` field, specify a full path to `src/main.py`.  
@@ -89,7 +89,9 @@ Here's how to do it:
   * Prediction - By pressing this button, you process the images through the network. The Neuroscope doesn't automatically feed images to the network, so you don't lose results if you select another model.
   * Filter - postprocessing 
     Setting - it's for the current inspection method, or related to the algorithm.
-    
+
+> **Note:** If you get a `OSError: Unable to open file (file signature not found)` when trying to run the examples, make sure to download the `.h5` files directly from GitHub, as these might have been corrupted due to file size during `git clone`. 
+
 ## Cite
 ```
 @Article{app11052199,
