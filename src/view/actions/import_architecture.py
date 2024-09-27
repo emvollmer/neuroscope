@@ -17,24 +17,28 @@ class ImportArchitecture(QAction):
         self.document = document
 
     def perform_action(self):
-        file_path = QFileDialog.getOpenFileName(self.main_window,
-                                                "Load Network Architecture",
-                                                filter="All files(*.*);;"
-                                                       "JSON files(*.json);; H5DF(*.h5)")
+        file_path = QFileDialog.getOpenFileName(
+            self.main_window,
+            "Load Network Architecture",
+            filter="All files(*.*);;"
+            "JSON files(*.json);; H5DF(*.h5)"
+        )
         if file_path[0]:
             self.main_window.open_architecture_window()
             self.main_window.app.setOverrideCursor(Qt.WaitCursor)
             model_name, extension = os.path.splitext(file_path[0])
-            if extension == '.h5':
+            if extension == '.h5' or extension == '.hdf5':
                 BACKEND_PROVIDER.activate_backend('Keras')
             elif extension == '.pt':
                 BACKEND_PROVIDER.activate_backend('Pytorch')
             else:
                 self.main_window.app.restoreOverrideCursor()
-                QMessageBox.critical(self.main_window,
-                                     "The selected file is not supported",
-                                     "The file is corrupted or does not contain a supported model",
-                                     QMessageBox.Ok)
+                QMessageBox.critical(
+                    self.main_window,
+                    "The selected file is not supported",
+                    "The file is corrupted or does not contain a supported model",
+                    QMessageBox.Ok
+                )
                 return
             backend = BACKEND_PROVIDER.get_current_backend()
             model = backend.load(file_path[0], 'model')

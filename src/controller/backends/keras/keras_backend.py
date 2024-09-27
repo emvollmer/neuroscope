@@ -1,6 +1,7 @@
 # -*-coding:utf-8-*-
 import os
 import json
+import re
 import tempfile
 import h5py
 import numpy as np
@@ -8,9 +9,37 @@ import keras
 import keras.backend as K
 from tensorflow.python.framework import ops
 import tensorflow as tf
+import tensorflow_addons as tfa
+import segmentation_models as sm
 from model.core import Model, Layer
 from controller.backends.backend import Backend
 from .h5dict import H5Dict
+
+
+def extract_custom_object(error_message):
+    """Extracts the missing custom object name from the ValueError message.
+    """
+    match = re.search(
+        r"Unknown (?:loss|metric) function: (?:Addons>)?([^.\s]+)",
+        error_message)
+    if match:
+        return match.group(1)
+    return None
+
+
+def find_custom_object(name):
+    """Try to find the custom object in known locations: tfa.losses, sm.metrics
+    """
+    possible_locations = [
+        tfa.losses,
+        sm.metrics,
+    ]
+    name = name.replace("-", "_")
+    for location in possible_locations:
+        custom_object = getattr(location, name, None)
+        if custom_object is not None:
+            return custom_object
+    return None
 
 
 class KerasBackend(Backend):
@@ -24,8 +53,35 @@ class KerasBackend(Backend):
         return model
 
     def load_model(self, file_path):
+        """Load Keras model with dynamically found custom objects.
+        """
+        custom_objects = {}
         model = self._keras_model_from_hdf5(file_path)
-        model.native_model = keras.models.load_model(file_path)
+
+        while True:
+            try:
+                # Attempt to load the model with the known custom objects
+                with keras.utils.custom_object_scope(custom_objects):
+                    model.native_model = keras.models.load_model(file_path)
+                print("Model loaded successfully.")
+                break  # Exit loop if model is loaded without errors
+
+            except ValueError as e:
+                custom_object_name = extract_custom_object(str(e))
+                if not custom_object_name:
+                    print(f"Could not extract custom object from error {e}.")
+                    raise e
+
+                custom_object = find_custom_object(custom_object_name)
+                if custom_object is None:
+                    print(f"Custom object '{custom_object_name}' not found in "
+                          f"known modules.")
+                    raise e
+
+                # register the found custom object
+                custom_objects[custom_object_name] = custom_object
+                print(f"Registered custom object: {custom_object_name}")
+
         return model
 
     def predict(self, model, model_input):
@@ -62,7 +118,6 @@ class KerasBackend(Backend):
             model_config = h5dict['model_config']
             if model_config is None:
                 raise ValueError('No model found in config.')
-            model_config = model_config.decode('utf-8')
             config = json.loads(model_config)
             model = self._keras_model_from_json(config['config'])
         finally:
@@ -75,7 +130,10 @@ class KerasBackend(Backend):
         K.set_learning_phase(0)
         target_layer_output = model.native_model.layers[target_layer_index].output
         if model.native_model.input != target_layer_output:
-            compute_output_function = K.function(inputs=[model.native_model.input], outputs=[target_layer_output])
+            compute_output_function = K.function(
+                inputs=[model.native_model.input],
+                outputs=[target_layer_output]
+            )
             output = compute_output_function([model_input])[0]
             output = np.squeeze(output)
             if output.ndim == 3:
@@ -84,11 +142,16 @@ class KerasBackend(Backend):
             output = model_input
         return output
 
-    def gradients_of_output_wrt_input(self, model, model_input, model_input_layer_index, class_index):
+    def gradients_of_output_wrt_input(self, model, model_input,
+                                      model_input_layer_index, class_index):
         K.set_learning_phase(0)
         desire_layer = model.native_model.layers[model_input_layer_index].output
-        gradients = K.gradients(model.native_model.output[0][..., class_index], desire_layer)
-        compute_gradients = K.function(inputs=[model.native_model.input], outputs=gradients)
+        gradients = K.gradients(
+            model.native_model.output[0][..., class_index],
+            desire_layer
+        )
+        compute_gradients = K.function(inputs=[model.native_model.input],
+                                       outputs=gradients)
         gradients = compute_gradients([model_input])
         return gradients[0]
 
@@ -112,7 +175,9 @@ class KerasBackend(Backend):
             # register modifier and load modified model under custom context.
             self._register_guided_gradient('guided_relu')
             # create graph under custom context manager
-            with tf.get_default_graph().gradient_override_map({'Relu': 'guided_relu'}):
+            with tf.get_default_graph().gradient_override_map(
+                    {'Relu': 'guided_relu'}
+            ):
                 # this should rebuild graph with modifications.
                 model.native_model = keras.models.load_model(model_path)
         finally:
